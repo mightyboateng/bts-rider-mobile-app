@@ -1,30 +1,24 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
+import 'package:rider_app/core/theme/rider_colors.dart';
+import 'package:rider_app/core/utils/currency_formatter.dart';
 import 'package:rider_app/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
-
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+  testWidgets('BTS Rider app boots to Radar shell', (tester) async {
+    await tester.pumpWidget(const BtsRiderApp());
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Radar'), findsOneWidget);
+    expect(find.text('Wallet'), findsOneWidget);
+    expect(find.textContaining("You're offline"), findsOneWidget);
+  });
+
+  test('currency formatter uses GHS', () {
+    expect(CurrencyFormatter.ghs(24.5), 'GHS 24.50');
+  });
+
+  test('rider primary matches design system', () {
+    expect(RiderColors.primary, const Color(0xFF0B6E2E));
   });
 }
