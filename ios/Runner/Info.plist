@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>BTS uses your location to offer nearby jobs and record your trip anywhere in Ghana.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>BTS uses your location to offer nearby jobs and record your trip anywhere in Ghana.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>BTS uses the camera to capture proof of delivery at drop-off.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

@@ -15,6 +15,8 @@ class DeliveryStateSheet extends StatelessWidget {
     required this.onAdvance,
     this.photoCaptured = false,
     this.onCapturePhoto,
+    this.deliveryOtp = '',
+    this.onOtpChanged,
   });
 
   final DeliveryJob job;
@@ -22,6 +24,8 @@ class DeliveryStateSheet extends StatelessWidget {
   final VoidCallback onAdvance;
   final bool photoCaptured;
   final VoidCallback? onCapturePhoto;
+  final String deliveryOtp;
+  final ValueChanged<String>? onOtpChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -50,9 +54,20 @@ class DeliveryStateSheet extends StatelessWidget {
               onCapture: onCapturePhoto,
             ),
             const SizedBox(height: 14),
+            TextField(
+              keyboardType: TextInputType.number,
+              maxLength: 4,
+              onChanged: onOtpChanged,
+              decoration: const InputDecoration(
+                counterText: '',
+                hintText: 'Customer 4-digit code',
+                prefixIcon: Icon(Icons.lock_outline),
+              ),
+            ),
+            const SizedBox(height: 14),
             SwipeToConfirm(
               label: 'Complete Delivery',
-              enabled: photoCaptured,
+              enabled: photoCaptured && deliveryOtp.length == 4,
               onConfirmed: onAdvance,
             ),
           ] else
@@ -122,7 +137,7 @@ class DeliveryStateSheet extends StatelessWidget {
       case DeliveryPhase.proofOfDelivery:
         return [
           Text(
-            'Capture a clear photo of the delivered package before completing.',
+            'Ask the customer for the 4-digit code shown on their order screen, then take a photo of the handover.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: RiderColors.mutedText,
             ),
@@ -219,7 +234,7 @@ class _PodCaptureCard extends StatelessWidget {
               ),
               if (!captured)
                 Text(
-                  'Tap to simulate camera capture',
+                  'Tap to open camera',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
             ],
