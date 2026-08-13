@@ -7,7 +7,22 @@
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>BTS uses your location to offer nearby jobs and record your trip anywhere in Ghana.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>BTS uses the camera to capture proof of delivery at drop-off.</string>
+	<string>BTS uses the camera to capture proof of delivery and verification photos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>BTS uses your photos to upload verification documents.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>gh.bts.rider</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>gh.bts.rider</string>
+			</array>
+		</dict>
+	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

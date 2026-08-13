@@ -28,24 +28,26 @@ What exists:
 - Polled job offers, accept/reject, status swipes, camera POD, 4-digit delivery OTP
 - Wallet from `GET /v1/rider/earnings` and `/ledger`
 - Location stream while online/on-job (Socket.io, HTTP fallback)
+- In-app KYC webview (`POST /v1/onboarding/session`); waiting screen until an admin approves
 - Riverpod + `go_router` (replaces `RiderSessionController`)
 
 What does not exist:
 
 - Google Maps turn-by-turn (needs Maps keys)
 - Store-grade Android foreground service (Phase 10). Location updates while the app is open.
-- KYC webview (Phase 7). Until then an admin runs `npm run rider:create`
+- GCS of KYC files (Phase 0 keys). Dev uploads land in the API `.data/kyc/` folder.
 - GCS upload of the proof photo (`podImageUrl` is optional)
 
 ---
 
 ## Getting started
 
-Create an approved rider, then run the API and the app.
+Sign in with a new Ghana number and complete verification in-app, or skip KYC for fulfilment tests.
 
 ```bash
 # In bts-admin-web-controller
-npm run rider:create
+npm run admin:create    # once
+# npm run rider:create  # optional: skip KYC for Phase 4 testing
 npm run dev
 
 # In this repo
@@ -74,8 +76,7 @@ OTP codes print in the Next.js terminal while `SMS_PRIMARY_PROVIDER=console`.
 They must be identical, and this is effectively irreversible after publication.
 
 Also outstanding: upload keystore, background-location Play justification, Sign in with Apple,
-in-app account deletion, deep links (`gh.bts.rider`), Android foreground service for background
-location (Phase 10).
+in-app account deletion, Android foreground service for background location (Phase 10).
 
-KYC (Phase 7) is the next rider-app product gap. Cash-cap and commission are already enforced on
-the server.
+Cash-cap and commission are already enforced on the server. KYC is in-app; GCS keys are still
+Phase 0.

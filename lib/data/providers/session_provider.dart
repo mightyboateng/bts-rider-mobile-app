@@ -19,6 +19,7 @@ class SessionState {
     required this.status,
     this.user,
     this.riderProfile,
+    this.onboardingApplication,
     this.challenge,
     this.error,
     this.busy = false,
@@ -27,6 +28,7 @@ class SessionState {
   final SessionStatus status;
   final BtsUser? user;
   final RiderProfile? riderProfile;
+  final OnboardingApplication? onboardingApplication;
   final OtpChallenge? challenge;
   final String? error;
   final bool busy;
@@ -35,6 +37,7 @@ class SessionState {
     SessionStatus? status,
     BtsUser? user,
     RiderProfile? riderProfile,
+    OnboardingApplication? onboardingApplication,
     OtpChallenge? challenge,
     String? error,
     bool? busy,
@@ -46,6 +49,7 @@ class SessionState {
       status: status ?? this.status,
       user: clearUser ? null : (user ?? this.user),
       riderProfile: clearUser ? null : (riderProfile ?? this.riderProfile),
+      onboardingApplication: clearUser ? null : (onboardingApplication ?? this.onboardingApplication),
       challenge: clearChallenge ? null : (challenge ?? this.challenge),
       error: clearError ? null : (error ?? this.error),
       busy: busy ?? this.busy,
@@ -171,13 +175,25 @@ class SessionNotifier extends Notifier<SessionState> {
     state = const SessionState(status: SessionStatus.signedOut);
   }
 
+  Future<void> refreshMe() async {
+    try {
+      await _applyMe(await core.auth.me());
+    } on ApiException catch (error) {
+      state = state.copyWith(error: error.message);
+    }
+  }
+
   void clearChallenge() {
     state = state.copyWith(clearChallenge: true, clearError: true);
   }
 
   Future<void> _applyMe(MeResponse me) async {
     if (!me.user.hasName) {
-      state = SessionState(status: SessionStatus.needsProfile, user: me.user);
+      state = SessionState(
+        status: SessionStatus.needsProfile,
+        user: me.user,
+        onboardingApplication: me.onboardingApplication,
+      );
       return;
     }
     final rider = me.riderProfile;
@@ -186,6 +202,7 @@ class SessionNotifier extends Notifier<SessionState> {
         status: SessionStatus.needsRiderAccount,
         user: me.user,
         riderProfile: rider,
+        onboardingApplication: me.onboardingApplication,
       );
       return;
     }
@@ -193,6 +210,7 @@ class SessionNotifier extends Notifier<SessionState> {
       status: SessionStatus.signedIn,
       user: me.user,
       riderProfile: rider,
+      onboardingApplication: me.onboardingApplication,
     );
   }
 }
