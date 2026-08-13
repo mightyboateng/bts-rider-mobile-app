@@ -73,6 +73,7 @@ class SessionNotifier extends Notifier<SessionState> {
   Future<void> start() async {
     try {
       const override = String.fromEnvironment('BTS_API_BASE_URL');
+      const realtimeOverride = String.fromEnvironment('BTS_REALTIME_URL');
       final platform = !kIsWeb && Platform.isIOS ? BtsPlatform.ios : BtsPlatform.android;
 
       _core = await BtsCore.bootstrap(
@@ -81,6 +82,7 @@ class SessionNotifier extends Notifier<SessionState> {
           appVersion: '1.0.0',
           platform: platform,
           overrideBaseUrl: override.isEmpty ? null : override,
+          overrideRealtimeUrl: realtimeOverride.isEmpty ? null : realtimeOverride,
         ),
         onSessionExpired: () {
           state = const SessionState(status: SessionStatus.signedOut);

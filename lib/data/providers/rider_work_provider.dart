@@ -98,12 +98,17 @@ final riderWorkProvider = NotifierProvider<RiderWorkNotifier, RiderWorkState>(Ri
 class RiderWorkNotifier extends Notifier<RiderWorkState> {
   Timer? _poll;
   Timer? _countdown;
+  Timer? _location;
+  LocationStreamer? _streamer;
+  int? _heading;
 
   @override
   RiderWorkState build() {
     ref.onDispose(() {
       _poll?.cancel();
       _countdown?.cancel();
+      _location?.cancel();
+      unawaited(_coreOrNull?.realtime.disconnect());
     });
     ref.listen<SessionState>(sessionProvider, (previous, next) {
       if (next.status == SessionStatus.signedIn && previous?.status != SessionStatus.signedIn) {
@@ -112,6 +117,7 @@ class RiderWorkNotifier extends Notifier<RiderWorkState> {
       if (next.status != SessionStatus.signedIn) {
         _stopPolling();
         _countdown?.cancel();
+        _stopRealtime();
         state = const RiderWorkState();
       }
     });
@@ -119,6 +125,14 @@ class RiderWorkNotifier extends Notifier<RiderWorkState> {
   }
 
   BtsCore get _core => ref.read(sessionProvider.notifier).core;
+
+  BtsCore? get _coreOrNull {
+    try {
+      return ref.read(sessionProvider.notifier).core;
+    } catch (_) {
+      return null;
+    }
+  }
 
   Future<void> goOnline() async {
     await _refreshLocation();
@@ -131,6 +145,7 @@ class RiderWorkNotifier extends Notifier<RiderWorkState> {
       );
       RiderHaptics.heavy();
       _startPolling();
+      _startRealtime();
       await _pollOffers();
     } on ApiException catch (error) {
       if (error.code == 'CASH_CAP_EXCEEDED') {
@@ -145,6 +160,7 @@ class RiderWorkNotifier extends Notifier<RiderWorkState> {
   Future<void> goOffline() async {
     _stopPolling();
     _countdown?.cancel();
+    _stopRealtime();
     try {
       await _core.rider.setPresence(status: 'offline', lat: state.lat, lng: state.lng);
     } on ApiException catch (error) {
@@ -320,12 +336,64 @@ class RiderWorkNotifier extends Notifier<RiderWorkState> {
     await refreshWallet();
     if (state.isOnline) {
       _startPolling();
+    } else {
+      _stopRealtime();
     }
   }
 
   void _startPolling() {
     _poll?.cancel();
     _poll = Timer.periodic(const Duration(seconds: 4), (_) => _pollOffers());
+  }
+
+  void _startRealtime() {
+    final core = _core;
+    _streamer = LocationStreamer(
+      realtime: core.realtime,
+      postHttp: (points, {orderId}) async {
+        await core.rider.postLocationBatch(
+          points.map((point) => point.toJson()).toList(),
+          orderId: orderId,
+        );
+      },
+    );
+    core.realtime.onReconnected = () {
+      unawaited(core.realtime.refreshAuth());
+      unawaited(_streamer?.flush());
+      unawaited(_pollOffers());
+    };
+    unawaited(() async {
+      await core.realtime.connect('rider');
+      core.realtime.on('job.offered', (_) => unawaited(_pollOffers()));
+      core.realtime.on('job.taken', (_) {
+        if (state.hasIncomingJob) unawaited(rejectIncomingJob(auto: true));
+      });
+    }());
+    _location?.cancel();
+    _location = Timer.periodic(const Duration(seconds: 4), (_) => unawaited(_pushLocation()));
+    unawaited(_pushLocation());
+  }
+
+  void _stopRealtime() {
+    _location?.cancel();
+    _location = null;
+    unawaited(_streamer?.flush());
+    _streamer = null;
+    unawaited(_coreOrNull?.realtime.disconnect());
+  }
+
+  Future<void> _pushLocation() async {
+    if (!state.isOnline && !state.isBusy) return;
+    await _refreshLocation();
+    await _streamer?.ingest(
+      LocationSample(
+        lat: state.lat,
+        lng: state.lng,
+        at: DateTime.now().toUtc(),
+        headingDegrees: _heading,
+        orderId: state.activeJob?.id,
+      ),
+    );
   }
 
   void _stopPolling() {
@@ -375,6 +443,8 @@ class RiderWorkNotifier extends Notifier<RiderWorkState> {
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       );
       state = state.copyWith(lat: position.latitude, lng: position.longitude);
+      final heading = position.heading;
+      _heading = heading.isFinite ? ((heading.round() % 360) + 360) % 360 : null;
     } catch (_) {}
   }
 }
