@@ -8,7 +8,8 @@ class DeliveryStepper extends StatelessWidget {
 
   final DeliveryPhase phase;
 
-  static const _labels = ['Pickup', 'Collect', 'Drop-off', 'POD'];
+  static const _labels = ['Pickup', 'Collect', 'Drop-off', 'Pay & POD'];
+  static const _duration = Duration(milliseconds: 380);
 
   @override
   Widget build(BuildContext context) {
@@ -19,9 +20,17 @@ class DeliveryStepper extends StatelessWidget {
           final after = i ~/ 2;
           final done = current > after;
           return Expanded(
-            child: Container(
-              height: 3,
-              color: done ? RiderColors.primary : RiderColors.border,
+            child: Stack(
+              children: [
+                Container(height: 3, color: RiderColors.border),
+                AnimatedFractionallySizedBox(
+                  duration: _duration,
+                  curve: Curves.easeOutCubic,
+                  widthFactor: done ? 1 : 0,
+                  alignment: Alignment.centerLeft,
+                  child: Container(height: 3, color: RiderColors.primary),
+                ),
+              ],
             ),
           );
         }
@@ -30,45 +39,55 @@ class DeliveryStepper extends StatelessWidget {
         final active = current == index;
         return Column(
           children: [
-            Container(
-              width: 28,
-              height: 28,
+            AnimatedContainer(
+              duration: _duration,
+              curve: Curves.easeOutBack,
+              width: active ? 30 : 28,
+              height: active ? 30 : 28,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: done || active
-                    ? RiderColors.primary
-                    : RiderColors.primaryWhite,
+                color: done || active ? RiderColors.primary : RiderColors.primaryWhite,
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: done || active
-                      ? RiderColors.primary
-                      : RiderColors.border,
+                  color: done || active ? RiderColors.primary : RiderColors.border,
                   width: 2,
                 ),
+                boxShadow: active
+                    ? [
+                        BoxShadow(
+                          color: RiderColors.primary.withValues(alpha: 0.35),
+                          blurRadius: 10,
+                          spreadRadius: 1,
+                        ),
+                      ]
+                    : const [],
               ),
-              child: done
-                  ? const Icon(Icons.check, size: 16, color: Colors.white)
-                  : Text(
-                      '${index + 1}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                        color: active
-                            ? RiderColors.primaryWhite
-                            : RiderColors.mutedText,
+              child: AnimatedSwitcher(
+                duration: _duration,
+                transitionBuilder: (child, animation) =>
+                    ScaleTransition(scale: animation, child: child),
+                child: done
+                    ? const Icon(Icons.check, key: ValueKey('done'), size: 16, color: Colors.white)
+                    : Text(
+                        '${index + 1}',
+                        key: const ValueKey('num'),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                          color: active ? RiderColors.primaryWhite : RiderColors.mutedText,
+                        ),
                       ),
-                    ),
+              ),
             ),
             const SizedBox(height: 4),
-            Text(
-              _labels[index],
+            AnimatedDefaultTextStyle(
+              duration: _duration,
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
-                color: active || done
-                    ? RiderColors.primaryBlack
-                    : RiderColors.mutedText,
+                color: active || done ? RiderColors.primaryBlack : RiderColors.mutedText,
               ),
+              child: Text(_labels[index]),
             ),
           ],
         );

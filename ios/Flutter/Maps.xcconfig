@@ -1,0 +1,3 @@
+// Google Maps SDK for iOS key. Restrict it to this app's bundle id in Google Cloud.
+// Replace the placeholder; this file is safe to keep out of git once you do.
+MAPS_API_KEY = YOUR_IOS_MAPS_KEY

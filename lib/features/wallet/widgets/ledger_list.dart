@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/motion/motion.dart';
 import '../../../core/theme/rider_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../models/wallet.dart';
@@ -22,7 +23,7 @@ class LedgerList extends StatelessWidget {
     }
 
     return Column(
-      children: [
+      children: staggerIn([
         for (final entry in entries) ...[
           Container(
             padding: const EdgeInsets.symmetric(vertical: 14),
@@ -69,7 +70,7 @@ class LedgerList extends StatelessWidget {
             ),
           ),
         ],
-      ],
+      ]),
     );
   }
 }

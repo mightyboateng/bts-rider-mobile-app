@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/motion/motion.dart';
 import '../../data/providers/session_provider.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/otp_screen.dart';
@@ -49,13 +50,34 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
     },
     routes: [
-      GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
-      GoRoute(path: '/permissions', builder: (_, _) => const PermissionsScreen()),
-      GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
-      GoRoute(path: '/otp', builder: (_, _) => const OtpScreen()),
-      GoRoute(path: '/profile-setup', builder: (_, _) => const ProfileSetupScreen()),
-      GoRoute(path: '/waiting', builder: (_, _) => const WaitingApprovalScreen()),
-      GoRoute(path: '/home', builder: (_, _) => const HomeShell()),
+      GoRoute(
+        path: '/splash',
+        pageBuilder: (_, state) => fadeThroughPage(state: state, child: const SplashScreen()),
+      ),
+      GoRoute(
+        path: '/permissions',
+        pageBuilder: (_, state) => fadeThroughPage(state: state, child: const PermissionsScreen()),
+      ),
+      GoRoute(
+        path: '/login',
+        pageBuilder: (_, state) => fadeThroughPage(state: state, child: const LoginScreen()),
+      ),
+      GoRoute(
+        path: '/otp',
+        pageBuilder: (_, state) => fadeThroughPage(state: state, child: const OtpScreen()),
+      ),
+      GoRoute(
+        path: '/profile-setup',
+        pageBuilder: (_, state) => fadeThroughPage(state: state, child: const ProfileSetupScreen()),
+      ),
+      GoRoute(
+        path: '/waiting',
+        pageBuilder: (_, state) => fadeThroughPage(state: state, child: const WaitingApprovalScreen()),
+      ),
+      GoRoute(
+        path: '/home',
+        pageBuilder: (_, state) => fadeThroughPage(state: state, child: const HomeShell()),
+      ),
     ],
   );
 });

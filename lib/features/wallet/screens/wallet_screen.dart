@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/motion/motion.dart';
 import '../../../core/theme/rider_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/providers/rider_work_provider.dart';
@@ -26,7 +27,7 @@ class WalletScreen extends ConsumerWidget {
       color: overCap ? RiderColors.dangerSoft.withValues(alpha: 0.35) : RiderColors.primaryWhite,
       child: ListView(
         padding: EdgeInsets.fromLTRB(20, topInset + 16, 20, 32),
-        children: [
+        children: staggerIn([
           Text('Wallet', style: theme.textTheme.headlineLarge),
           const SizedBox(height: 4),
           Text(user?.displayName ?? 'Rider', style: theme.textTheme.titleMedium),
@@ -75,7 +76,7 @@ class WalletScreen extends ConsumerWidget {
             onPressed: () => ref.read(sessionProvider.notifier).signOut(),
             child: const Text('Sign out'),
           ),
-        ],
+        ]),
       ),
     );
   }

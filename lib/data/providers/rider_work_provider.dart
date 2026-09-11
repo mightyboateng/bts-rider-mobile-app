@@ -32,6 +32,7 @@ class RiderWorkState {
     this.busy = false,
     this.lat = AppConstants.defaultLat,
     this.lng = AppConstants.defaultLng,
+    this.heading,
   });
 
   final RiderOnlineStatus status;
@@ -48,6 +49,9 @@ class RiderWorkState {
   final bool busy;
   final double lat;
   final double lng;
+
+  /// Compass heading in degrees, when the device reports one.
+  final int? heading;
 
   bool get isOnline => status == RiderOnlineStatus.online;
   bool get isBusy => status == RiderOnlineStatus.busy;
@@ -70,6 +74,7 @@ class RiderWorkState {
     bool? busy,
     double? lat,
     double? lng,
+    int? heading,
     bool clearIncoming = false,
     bool clearActive = false,
     bool clearError = false,
@@ -89,6 +94,7 @@ class RiderWorkState {
       busy: busy ?? this.busy,
       lat: lat ?? this.lat,
       lng: lng ?? this.lng,
+      heading: heading ?? this.heading,
     );
   }
 }
@@ -99,6 +105,7 @@ class RiderWorkNotifier extends Notifier<RiderWorkState> {
   Timer? _poll;
   Timer? _countdown;
   Timer? _location;
+  Timer? _paymentPoll;
   LocationStreamer? _streamer;
   int? _heading;
 
@@ -108,6 +115,7 @@ class RiderWorkNotifier extends Notifier<RiderWorkState> {
       _poll?.cancel();
       _countdown?.cancel();
       _location?.cancel();
+      _paymentPoll?.cancel();
       unawaited(_coreOrNull?.realtime.disconnect());
     });
     ref.listen<SessionState>(sessionProvider, (previous, next) {
@@ -117,6 +125,8 @@ class RiderWorkNotifier extends Notifier<RiderWorkState> {
       if (next.status != SessionStatus.signedIn) {
         _stopPolling();
         _countdown?.cancel();
+        _paymentPoll?.cancel();
+        _paymentPoll = null;
         _stopRealtime();
         state = const RiderWorkState();
       }
@@ -249,13 +259,23 @@ class RiderWorkNotifier extends Notifier<RiderWorkState> {
           );
           state = state.copyWith(phase: DeliveryPhase.navigatingToDropoff, clearError: true);
         case DeliveryPhase.navigatingToDropoff:
-          await _core.rider.updateStatus(
+          final updated = await _core.rider.updateStatus(
             orderId: job.id,
             status: 'arrived_dropoff',
             lat: state.lat,
             lng: state.lng,
           );
-          state = state.copyWith(phase: DeliveryPhase.proofOfDelivery, clearError: true);
+          final merged = _mergePayment(job, updated);
+          state = state.copyWith(
+            activeJob: merged,
+            phase: merged.paymentSettled ? DeliveryPhase.proofOfDelivery : DeliveryPhase.awaitingPayment,
+            clearError: true,
+          );
+          _syncPaymentPoll();
+        case DeliveryPhase.awaitingPayment:
+          // The customer drives this step; the swipe just re-checks the server.
+          await refreshActiveJob();
+          return;
         case DeliveryPhase.proofOfDelivery:
           if (!state.photoCaptured || state.deliveryOtp.length != 4) return;
           await _complete(job);
@@ -265,7 +285,45 @@ class RiderWorkNotifier extends Notifier<RiderWorkState> {
       }
       RiderHaptics.heavy();
     } on ApiException catch (error) {
+      if (error.code == 'PAYMENT_REQUIRED') {
+        state = state.copyWith(phase: DeliveryPhase.awaitingPayment, error: error.message);
+        _syncPaymentPoll();
+        unawaited(refreshActiveJob());
+        return;
+      }
       state = state.copyWith(error: error.message);
+    }
+  }
+
+  /// Re-fetch the active job (payment method / status) and move the phase
+  /// forward once the customer has settled how they will pay.
+  Future<void> refreshActiveJob() async {
+    final job = state.activeJob;
+    if (job == null) return;
+    try {
+      final fresh = await _core.rider.getJob(job.id);
+      final merged = _mergePayment(job, fresh);
+      final wasWaiting = state.phase == DeliveryPhase.awaitingPayment;
+      final settledNow = merged.paymentSettled && fresh.status == 'arrived_dropoff';
+      state = state.copyWith(
+        activeJob: merged,
+        phase: wasWaiting && settledNow ? DeliveryPhase.proofOfDelivery : null,
+        clearError: wasWaiting && settledNow,
+      );
+      if (wasWaiting && settledNow) RiderHaptics.heavy();
+      _syncPaymentPoll();
+    } on ApiException catch (_) {}
+  }
+
+  /// Socket delivery of `payment.updated` is the fast path; this poll is the
+  /// safety net while the rider is parked at the drop-off waiting.
+  void _syncPaymentPoll() {
+    final waiting = state.phase == DeliveryPhase.awaitingPayment && state.activeJob != null;
+    if (waiting && _paymentPoll == null) {
+      _paymentPoll = Timer.periodic(const Duration(seconds: 5), (_) => unawaited(refreshActiveJob()));
+    } else if (!waiting) {
+      _paymentPoll?.cancel();
+      _paymentPoll = null;
     }
   }
 
@@ -323,7 +381,10 @@ class RiderWorkNotifier extends Notifier<RiderWorkState> {
       deliveryOtp: state.deliveryOtp,
       lat: state.lat,
       lng: state.lng,
+      cashCollectedPesewas: job.isCash ? job.cashDuePesewas : null,
     );
+    _paymentPoll?.cancel();
+    _paymentPoll = null;
     state = state.copyWith(
       clearActive: true,
       photoCaptured: false,
@@ -367,6 +428,12 @@ class RiderWorkNotifier extends Notifier<RiderWorkState> {
       core.realtime.on('job.offered', (_) => unawaited(_pollOffers()));
       core.realtime.on('job.taken', (_) {
         if (state.hasIncomingJob) unawaited(rejectIncomingJob(auto: true));
+      });
+      // Customer chose cash / MoMo, or a MoMo charge was confirmed.
+      core.realtime.on('payment.updated', (payload) {
+        final orderId = payload is Map ? payload['orderId'] as String? : null;
+        if (orderId != null && orderId != state.activeJob?.id) return;
+        unawaited(refreshActiveJob());
       });
     }());
     _location?.cancel();
@@ -442,9 +509,9 @@ class RiderWorkNotifier extends Notifier<RiderWorkState> {
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       );
-      state = state.copyWith(lat: position.latitude, lng: position.longitude);
       final heading = position.heading;
       _heading = heading.isFinite ? ((heading.round() % 360) + 360) % 360 : null;
+      state = state.copyWith(lat: position.latitude, lng: position.longitude, heading: _heading);
     } catch (_) {}
   }
 }
@@ -480,6 +547,16 @@ DeliveryJob _fromOffer(JobOffer offer) {
   );
 }
 
+DeliveryJob _mergePayment(DeliveryJob current, RiderJob fresh) {
+  return current.copyWith(
+    paymentMethod: fresh.paymentMethod,
+    clearPaymentMethod: fresh.paymentMethod == null,
+    paymentStatus: fresh.paymentStatus,
+    paymentSettled: fresh.paymentSettled,
+    cashDuePesewas: fresh.cashDuePesewas,
+  );
+}
+
 DeliveryJob _fromRiderJob(RiderJob job, {required DeliveryJob fallback}) {
   return DeliveryJob(
     id: job.id,
@@ -500,5 +577,9 @@ DeliveryJob _fromRiderJob(RiderJob job, {required DeliveryJob fallback}) {
     customerPhone: fallback.customerPhone,
     itemInstructions: job.itemNote ?? job.itemDescription ?? fallback.itemInstructions,
     etaMinutes: fallback.etaMinutes,
+    paymentMethod: job.paymentMethod,
+    paymentStatus: job.paymentStatus,
+    paymentSettled: job.paymentSettled,
+    cashDuePesewas: job.cashDuePesewas,
   );
 }

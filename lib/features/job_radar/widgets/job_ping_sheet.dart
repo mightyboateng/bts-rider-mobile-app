@@ -1,6 +1,8 @@
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
+import '../../../core/motion/motion.dart';
 import '../../../core/theme/rider_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/haptics.dart';
@@ -72,7 +74,7 @@ class _JobPingSheetState extends State<JobPingSheet>
       child: RiderBottomSheet(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+          children: staggerIn([
             Row(
               children: [
                 Expanded(
@@ -119,7 +121,10 @@ class _JobPingSheetState extends State<JobPingSheet>
             Text(
               CurrencyFormatter.ghs(widget.job.fareGhs),
               style: theme.textTheme.displayMedium,
-            ),
+            )
+                .animate()
+                .fadeIn(duration: 300.ms)
+                .scale(begin: const Offset(0.85, 0.85), curve: Curves.easeOutBack, duration: 450.ms),
             const SizedBox(height: 12),
             _RouteRow(
               icon: Icons.storefront_outlined,
@@ -163,7 +168,7 @@ class _JobPingSheetState extends State<JobPingSheet>
                 ),
               ],
             ),
-          ],
+          ]),
         ),
       ),
     );
