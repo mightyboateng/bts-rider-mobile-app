@@ -12,10 +12,12 @@ class OnboardingWebViewScreen extends ConsumerStatefulWidget {
   const OnboardingWebViewScreen({super.key});
 
   @override
-  ConsumerState<OnboardingWebViewScreen> createState() => _OnboardingWebViewScreenState();
+  ConsumerState<OnboardingWebViewScreen> createState() =>
+      _OnboardingWebViewScreenState();
 }
 
-class _OnboardingWebViewScreenState extends ConsumerState<OnboardingWebViewScreen> {
+class _OnboardingWebViewScreenState
+    extends ConsumerState<OnboardingWebViewScreen> {
   Uri? _url;
   String? _error;
   var _loading = true;
@@ -30,7 +32,9 @@ class _OnboardingWebViewScreenState extends ConsumerState<OnboardingWebViewScree
   Future<void> _openSession() async {
     try {
       final core = ref.read(sessionProvider.notifier).core;
-      final session = await core.onboarding.createSession(applicantType: 'rider');
+      final session = await core.onboarding.createSession(
+        applicantType: 'rider',
+      );
       if (!mounted) return;
       setState(() {
         _url = _rewriteForDevice(session.url, core.env.apiBaseUrl);
@@ -53,7 +57,11 @@ class _OnboardingWebViewScreenState extends ConsumerState<OnboardingWebViewScree
 
   Uri _rewriteForDevice(Uri url, Uri apiBase) {
     if (url.host == 'localhost' || url.host == '127.0.0.1') {
-      return url.replace(scheme: apiBase.scheme, host: apiBase.host, port: apiBase.hasPort ? apiBase.port : null);
+      return url.replace(
+        scheme: apiBase.scheme,
+        host: apiBase.host,
+        port: apiBase.hasPort ? apiBase.port : null,
+      );
     }
     return url;
   }
@@ -72,6 +80,8 @@ class _OnboardingWebViewScreenState extends ConsumerState<OnboardingWebViewScree
 
   @override
   Widget build(BuildContext context) {
+    final apiBase = ref.read(sessionProvider.notifier).core.env.apiBaseUrl;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Verification'),
@@ -83,32 +93,43 @@ class _OnboardingWebViewScreenState extends ConsumerState<OnboardingWebViewScree
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Text(_error!, style: const TextStyle(color: RiderColors.mutedText)),
-                )
-              : InAppWebView(
-                  initialUrlRequest: URLRequest(url: WebUri(_url!.toString())),
-                  initialSettings: InAppWebViewSettings(
-                    useShouldOverrideUrlLoading: true,
-                    mediaPlaybackRequiresUserGesture: false,
-                    allowsInlineMediaPlayback: true,
-                    javaScriptEnabled: true,
-                  ),
-                  shouldOverrideUrlLoading: (controller, action) async {
-                    final uri = action.request.url;
-                    if (_isReturnLink(uri)) {
-                      await _finish();
-                      return NavigationActionPolicy.CANCEL;
-                    }
-                    return NavigationActionPolicy.ALLOW;
-                  },
-                  onLoadStart: (controller, uri) {
-                    if (_isReturnLink(uri)) {
-                      unawaited(_finish());
-                    }
-                  },
-                ),
+          ? Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                _error!,
+                style: const TextStyle(color: RiderColors.mutedText),
+              ),
+            )
+          : InAppWebView(
+              initialUrlRequest: URLRequest(url: WebUri(_url!.toString())),
+              initialSettings: InAppWebViewSettings(
+                useShouldOverrideUrlLoading: true,
+                mediaPlaybackRequiresUserGesture: false,
+                allowsInlineMediaPlayback: true,
+                javaScriptEnabled: true,
+              ),
+              shouldOverrideUrlLoading: (controller, action) async {
+                final uri = action.request.url;
+                if (_isReturnLink(uri)) {
+                  await _finish();
+                  return NavigationActionPolicy.CANCEL;
+                }
+                if (uri != null &&
+                    (uri.host == 'localhost' || uri.host == '127.0.0.1')) {
+                  final rewritten = _rewriteForDevice(Uri.parse(uri.toString()), apiBase);
+                  await controller.loadUrl(
+                    urlRequest: URLRequest(url: WebUri(rewritten.toString())),
+                  );
+                  return NavigationActionPolicy.CANCEL;
+                }
+                return NavigationActionPolicy.ALLOW;
+              },
+              onLoadStart: (controller, uri) {
+                if (_isReturnLink(uri)) {
+                  unawaited(_finish());
+                }
+              },
+            ),
     );
   }
 }
