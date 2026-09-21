@@ -56,22 +56,29 @@ class _RiderMapViewState extends State<RiderMapView> with SingleTickerProviderSt
   LatLng _shown = const LatLng(0, 0);
   String? _framedKey;
   Timer? _frameDebounce;
+  DateTime _lastGlidePublish = DateTime.fromMillisecondsSinceEpoch(0);
 
   @override
   void initState() {
     super.initState();
     _from = _to = _shown = LatLng(widget.lat, widget.lng);
     _glide = AnimationController(vsync: this, duration: const Duration(milliseconds: 1000))
-      ..addListener(() {
-        final t = Curves.easeInOut.transform(_glide.value);
-        setState(() {
-          _shown = LatLng(
-            _from.latitude + (_to.latitude - _from.latitude) * t,
-            _from.longitude + (_to.longitude - _from.longitude) * t,
-          );
-        });
-      });
+      ..addListener(_onGlide);
     unawaited(_buildIcons());
+  }
+
+  void _onGlide() {
+    final t = Curves.easeInOut.transform(_glide.value);
+    final next = LatLng(
+      _from.latitude + (_to.latitude - _from.latitude) * t,
+      _from.longitude + (_to.longitude - _from.longitude) * t,
+    );
+    final now = DateTime.now();
+    if (_glide.value < 1 && now.difference(_lastGlidePublish) < const Duration(milliseconds: 80)) {
+      return;
+    }
+    _lastGlidePublish = now;
+    setState(() => _shown = next);
   }
 
   @override
@@ -211,22 +218,22 @@ class _RiderMapViewState extends State<RiderMapView> with SingleTickerProviderSt
       fit: StackFit.expand,
       children: [
         GoogleMap(
-          initialCameraPosition: CameraPosition(target: LatLng(widget.lat, widget.lng), zoom: 15.5),
-          onMapCreated: (controller) {
-            _controller = controller;
-            _scheduleFrame();
-          },
-          markers: markers,
-          polylines: polylines,
-          padding: EdgeInsets.only(bottom: widget.bottomPadding),
-          myLocationEnabled: false,
-          myLocationButtonEnabled: false,
-          zoomControlsEnabled: false,
-          mapToolbarEnabled: false,
-          compassEnabled: false,
-          buildingsEnabled: false,
-          trafficEnabled: widget.target != null,
-        ),
+            initialCameraPosition: CameraPosition(target: LatLng(widget.lat, widget.lng), zoom: 15.5),
+            onMapCreated: (controller) {
+              _controller = controller;
+              _scheduleFrame();
+            },
+            markers: markers,
+            polylines: polylines,
+            padding: EdgeInsets.only(bottom: widget.bottomPadding),
+            myLocationEnabled: false,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            compassEnabled: false,
+            buildingsEnabled: false,
+            trafficEnabled: false,
+          ),
         if (widget.statusChip case final chip?)
           Positioned(
             top: MediaQuery.paddingOf(context).top + 72,

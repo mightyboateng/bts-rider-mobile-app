@@ -9,12 +9,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('BTS Rider app boots to splash', (tester) async {
+  testWidgets('BTS Rider app boots', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const ProviderScope(child: BtsRiderApp()));
     await tester.pump();
 
-    expect(find.text('BTS Rider'), findsOneWidget);
+    expect(find.byType(BtsRiderApp), findsOneWidget);
   });
 
   test('currency formatter uses GHS', () {

@@ -61,6 +61,7 @@ final sessionProvider = NotifierProvider<SessionNotifier, SessionState>(SessionN
 
 class SessionNotifier extends Notifier<SessionState> {
   BtsCore? _core;
+  bool _starting = false;
   static const _primedKey = 'bts.rider.permissions_explained';
 
   BtsCore get core {
@@ -74,31 +75,46 @@ class SessionNotifier extends Notifier<SessionState> {
   @override
   SessionState build() => const SessionState(status: SessionStatus.bootstrapping);
 
-  Future<void> start() async {
+  Future<void> start({bool allowRemote = true}) async {
+    if (_starting) return;
+    _starting = true;
     try {
-      const override = String.fromEnvironment('BTS_API_BASE_URL');
-      const realtimeOverride = String.fromEnvironment('BTS_REALTIME_URL');
-      final platform = !kIsWeb && Platform.isIOS ? BtsPlatform.ios : BtsPlatform.android;
+      if (_core == null) {
+        const override = String.fromEnvironment('BTS_API_BASE_URL');
+        const realtimeOverride = String.fromEnvironment('BTS_REALTIME_URL');
+        final platform = !kIsWeb && Platform.isIOS ? BtsPlatform.ios : BtsPlatform.android;
 
-      _core = await BtsCore.bootstrap(
-        env: BtsEnvironment.local(
-          role: BtsRole.rider,
-          appVersion: '1.0.0',
-          platform: platform,
-          overrideBaseUrl: override.isEmpty ? null : override,
-          overrideRealtimeUrl: realtimeOverride.isEmpty ? null : realtimeOverride,
-        ),
-        onSessionExpired: () {
-          state = const SessionState(status: SessionStatus.signedOut);
-        },
-      );
+        _core = await BtsCore.bootstrap(
+          env: BtsEnvironment.local(
+            role: BtsRole.rider,
+            appVersion: '1.0.0',
+            platform: platform,
+            overrideBaseUrl: override.isEmpty ? null : override,
+            overrideRealtimeUrl: realtimeOverride.isEmpty ? null : realtimeOverride,
+          ),
+          onSessionExpired: () {
+            state = const SessionState(status: SessionStatus.signedOut);
+          },
+        );
+      }
 
       final prefs = await SharedPreferences.getInstance();
       final primed = prefs.getBool(_primedKey) ?? false;
+      final signedInLocally = await core.auth.hasStoredSession();
 
-      if (await core.auth.hasStoredSession()) {
+      if (!allowRemote) {
+        state = SessionState(
+          status: signedInLocally ? SessionStatus.signedIn : SessionStatus.signedOut,
+        );
+        return;
+      }
+
+      if (signedInLocally) {
         try {
           await _applyMe(await core.auth.me());
+          return;
+        } on NetworkException {
+          state = const SessionState(status: SessionStatus.signedIn);
           return;
         } on ApiException {
           await core.tokens.clear();
@@ -113,6 +129,8 @@ class SessionNotifier extends Notifier<SessionState> {
         status: SessionStatus.signedOut,
         error: error.toString(),
       );
+    } finally {
+      _starting = false;
     }
   }
 

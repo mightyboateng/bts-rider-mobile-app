@@ -1,0 +1,15 @@
+# Generate with: dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "#0B6E2E"
+  color_dark: "#0B6E2E"
+  image: assets/images/logo_white.png
+  image_dark: assets/images/logo_white.png
+  fullscreen: true
+
+  android_12:
+    color: "#0B6E2E"
+    color_dark: "#0B6E2E"
+    image: assets/images/logo_white.png
+    image_dark: assets/images/logo_white.png
+    icon_background_color: "#0B6E2E"
+    icon_background_color_dark: "#0B6E2E"
