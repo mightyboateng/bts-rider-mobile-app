@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../core/map/polyline_codec.dart';
@@ -26,7 +27,7 @@ class DashboardScreen extends ConsumerStatefulWidget {
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   final _sheet = DraggableScrollableController();
 
-  static const _kSheetPad = 0.36;
+  static const _kSheetPad = 0.4;
 
   @override
   void dispose() {
@@ -42,7 +43,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     ref.listen<RiderWorkState>(riderWorkProvider, (prev, next) {
       if (prev == null) return;
       if (!prev.hasIncomingJob && next.hasIncomingJob) {
-        _snapTo(0.52);
+        _snapTo(0.4);
       } else if (!prev.hasActiveDelivery && next.hasActiveDelivery) {
         _snapTo(0.4);
       }
@@ -72,6 +73,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 Row(
                   children: [
                     _StatusPill(status: session.status),
+                    const SizedBox(width: 8),
+                    _SettingsButton(onTap: () => context.push('/settings')),
                     const Spacer(),
                     EarningsPill(
                       amountGhs: session.wallet.todayEarningsGhs,
@@ -105,10 +108,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ),
         DraggableRiderSheet(
           controller: _sheet,
-          initialSize: 0.36,
+          initialSize: 0.4,
           minSize: 0.22,
           maxSize: 0.92,
-          snapSizes: const [0.28, 0.4, 0.88],
+          snapSizes: const [0.4, 0.88],
           builder: (context) => _bottomPanel(ref, session),
         ),
       ],
@@ -118,7 +121,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void _snapTo(double size) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_sheet.isAttached) return;
-      _sheet.animateTo(size, duration: const Duration(milliseconds: 280), curve: Curves.easeOutCubic);
+      _sheet.animateTo(size, duration: const Duration(milliseconds: 160), curve: Curves.easeOutCubic);
     });
   }
 
@@ -185,6 +188,30 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     if (encoded == null || encoded.isEmpty) return null;
     final points = decodePolyline(encoded);
     return points.length >= 2 ? points : null;
+  }
+}
+
+class _SettingsButton extends StatelessWidget {
+  const _SettingsButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: RiderColors.primaryWhite,
+      shape: const CircleBorder(),
+      elevation: 2,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: const SizedBox(
+          width: 40,
+          height: 40,
+          child: Icon(Icons.person_outline_rounded, size: 20),
+        ),
+      ),
+    );
   }
 }
 

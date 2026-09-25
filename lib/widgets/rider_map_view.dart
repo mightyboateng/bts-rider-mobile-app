@@ -200,7 +200,7 @@ class _RiderMapViewState extends State<RiderMapView> with SingleTickerProviderSt
         Polyline(
           polylineId: const PolylineId('job'),
           points: trip,
-          color: RiderColors.primaryBlack.withValues(alpha: 0.22),
+          color: RiderColors.primary.withValues(alpha: 0.28),
           width: 4,
           startCap: Cap.roundCap,
           endCap: Cap.roundCap,

@@ -11,6 +11,9 @@ import '../../features/auth/screens/profile_setup_screen.dart';
 import '../../features/auth/screens/splash_screen.dart';
 import '../../features/auth/screens/waiting_approval_screen.dart';
 import '../../features/home/home_shell.dart';
+import '../../features/rides/screens/ride_history_screen.dart';
+import '../../features/settings/screens/edit_profile_screen.dart';
+import '../../features/settings/screens/settings_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final refresh = _RouterRefresh(ref);
@@ -77,6 +80,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/home',
         pageBuilder: (_, state) => fadeThroughPage(state: state, child: const HomeShell()),
+      ),
+      GoRoute(
+        path: '/settings',
+        pageBuilder: (_, state) => fadeThroughPage(state: state, child: const RiderSettingsScreen()),
+      ),
+      GoRoute(
+        path: '/settings/profile',
+        pageBuilder: (_, state) => fadeThroughPage(state: state, child: const EditRiderProfileScreen()),
+      ),
+      GoRoute(
+        path: '/rides',
+        pageBuilder: (_, state) => fadeThroughPage(state: state, child: const RideHistoryScreen()),
       ),
     ],
   );

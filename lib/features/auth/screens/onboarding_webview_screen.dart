@@ -91,7 +91,16 @@ class _OnboardingWebViewScreenState
         ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Opening verification…'),
+                ],
+              ),
+            )
           : _error != null
           ? Padding(
               padding: const EdgeInsets.all(24),
@@ -107,7 +116,21 @@ class _OnboardingWebViewScreenState
                 mediaPlaybackRequiresUserGesture: false,
                 allowsInlineMediaPlayback: true,
                 javaScriptEnabled: true,
+                geolocationEnabled: true,
               ),
+              onPermissionRequest: (controller, request) async {
+                return PermissionResponse(
+                  resources: request.resources,
+                  action: PermissionResponseAction.GRANT,
+                );
+              },
+              onGeolocationPermissionsShowPrompt: (controller, origin) async {
+                return GeolocationPermissionShowPromptResponse(
+                  origin: origin,
+                  allow: true,
+                  retain: true,
+                );
+              },
               shouldOverrideUrlLoading: (controller, action) async {
                 final uri = action.request.url;
                 if (_isReturnLink(uri)) {
