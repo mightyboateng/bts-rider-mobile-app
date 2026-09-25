@@ -32,6 +32,8 @@ class DeliveryJob {
     this.paymentStatus = 'unpaid',
     this.paymentSettled = false,
     this.cashDuePesewas = 0,
+    this.tripPolyline,
+    this.legPolyline,
   });
 
   final String id;
@@ -45,14 +47,12 @@ class DeliveryJob {
   final String itemInstructions;
   final int etaMinutes;
 
-  /// `cash`, `momo`, or null while the customer has not chosen yet
-  /// (payment is chosen when the rider arrives at drop-off).
   final String? paymentMethod;
   final String paymentStatus;
-
-  /// True once the job can be closed: cash chosen, or MoMo confirmed.
   final bool paymentSettled;
   final int cashDuePesewas;
+  final String? tripPolyline;
+  final String? legPolyline;
 
   bool get awaitingPaymentChoice => paymentMethod == null;
   bool get awaitingMomoConfirmation => paymentMethod == 'momo' && !paymentSettled;
@@ -68,6 +68,8 @@ class DeliveryJob {
     bool? paymentSettled,
     int? cashDuePesewas,
     bool clearPaymentMethod = false,
+    String? tripPolyline,
+    String? legPolyline,
   }) {
     return DeliveryJob(
       id: id,
@@ -84,6 +86,8 @@ class DeliveryJob {
       paymentStatus: paymentStatus ?? this.paymentStatus,
       paymentSettled: paymentSettled ?? this.paymentSettled,
       cashDuePesewas: cashDuePesewas ?? this.cashDuePesewas,
+      tripPolyline: tripPolyline ?? this.tripPolyline,
+      legPolyline: legPolyline ?? this.legPolyline,
     );
   }
 }

@@ -104,7 +104,7 @@ final riderWorkProvider = NotifierProvider<RiderWorkNotifier, RiderWorkState>(Ri
 class RiderWorkNotifier extends Notifier<RiderWorkState> {
   Timer? _poll;
   Timer? _countdown;
-  Timer? _location;
+  StreamSubscription<Position>? _locationSub;
   Timer? _paymentPoll;
   LocationStreamer? _streamer;
   int? _heading;
@@ -114,7 +114,7 @@ class RiderWorkNotifier extends Notifier<RiderWorkState> {
     ref.onDispose(() {
       _poll?.cancel();
       _countdown?.cancel();
-      _location?.cancel();
+      _locationSub?.cancel();
       _paymentPoll?.cancel();
       unawaited(_coreOrNull?.realtime.disconnect());
     });
@@ -195,7 +195,7 @@ class RiderWorkNotifier extends Notifier<RiderWorkState> {
     _countdown?.cancel();
     try {
       final accepted = await _core.rider.accept(job.id);
-      await _core.rider.updateStatus(
+      final navigating = await _core.rider.updateStatus(
         orderId: job.id,
         status: 'navigating_pickup',
         lat: state.lat,
@@ -204,7 +204,10 @@ class RiderWorkNotifier extends Notifier<RiderWorkState> {
       state = state.copyWith(
         incomingJob: null,
         clearIncoming: true,
-        activeJob: _fromRiderJob(accepted, fallback: job),
+        activeJob: _fromRiderJob(navigating, fallback: job).copyWith(
+          tripPolyline: navigating.tripPolyline ?? accepted.tripPolyline,
+          legPolyline: navigating.legPolyline ?? accepted.legPolyline,
+        ),
         phase: DeliveryPhase.navigatingToPickup,
         photoCaptured: false,
         deliveryOtp: '',
@@ -212,7 +215,7 @@ class RiderWorkNotifier extends Notifier<RiderWorkState> {
         clearError: true,
       );
       RiderHaptics.heavy();
-      _stopPolling();
+      _startJobPoll();
     } on ApiException catch (error) {
       state = state.copyWith(clearIncoming: true, error: error.message);
       RiderHaptics.medium();
@@ -243,21 +246,29 @@ class RiderWorkNotifier extends Notifier<RiderWorkState> {
     try {
       switch (phase) {
         case DeliveryPhase.navigatingToPickup:
-          await _core.rider.updateStatus(
+          final updated = await _core.rider.updateStatus(
             orderId: job.id,
             status: 'arrived_pickup',
             lat: state.lat,
             lng: state.lng,
           );
-          state = state.copyWith(phase: DeliveryPhase.atPickup, clearError: true);
+          state = state.copyWith(
+            phase: DeliveryPhase.atPickup,
+            activeJob: _fromRiderJob(updated, fallback: job),
+            clearError: true,
+          );
         case DeliveryPhase.atPickup:
-          await _core.rider.updateStatus(
+          final updated = await _core.rider.updateStatus(
             orderId: job.id,
             status: 'navigating_dropoff',
             lat: state.lat,
             lng: state.lng,
           );
-          state = state.copyWith(phase: DeliveryPhase.navigatingToDropoff, clearError: true);
+          state = state.copyWith(
+            phase: DeliveryPhase.navigatingToDropoff,
+            activeJob: _fromRiderJob(updated, fallback: job),
+            clearError: true,
+          );
         case DeliveryPhase.navigatingToDropoff:
           final updated = await _core.rider.updateStatus(
             orderId: job.id,
@@ -302,7 +313,7 @@ class RiderWorkNotifier extends Notifier<RiderWorkState> {
     if (job == null) return;
     try {
       final fresh = await _core.rider.getJob(job.id);
-      final merged = _mergePayment(job, fresh);
+      final merged = _fromRiderJob(fresh, fallback: job);
       final wasWaiting = state.phase == DeliveryPhase.awaitingPayment;
       final settledNow = merged.paymentSettled && fresh.status == 'arrived_dropoff';
       state = state.copyWith(
@@ -407,6 +418,12 @@ class RiderWorkNotifier extends Notifier<RiderWorkState> {
     _poll = Timer.periodic(const Duration(seconds: 4), (_) => _pollOffers());
   }
 
+  void _startJobPoll() {
+    _poll?.cancel();
+    _poll = Timer.periodic(const Duration(seconds: 12), (_) => unawaited(refreshActiveJob()));
+    unawaited(refreshActiveJob());
+  }
+
   void _startRealtime() {
     final core = _core;
     _streamer = LocationStreamer(
@@ -436,14 +453,19 @@ class RiderWorkNotifier extends Notifier<RiderWorkState> {
         unawaited(refreshActiveJob());
       });
     }());
-    _location?.cancel();
-    _location = Timer.periodic(const Duration(seconds: 4), (_) => unawaited(_pushLocation()));
+    _locationSub?.cancel();
+    _locationSub = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 8,
+      ),
+    ).listen((_) => unawaited(_pushLocation()));
     unawaited(_pushLocation());
   }
 
   void _stopRealtime() {
-    _location?.cancel();
-    _location = null;
+    _locationSub?.cancel();
+    _locationSub = null;
     unawaited(_streamer?.flush());
     _streamer = null;
     unawaited(_coreOrNull?.realtime.disconnect());
@@ -581,5 +603,7 @@ DeliveryJob _fromRiderJob(RiderJob job, {required DeliveryJob fallback}) {
     paymentStatus: job.paymentStatus,
     paymentSettled: job.paymentSettled,
     cashDuePesewas: job.cashDuePesewas,
+    tripPolyline: job.tripPolyline ?? fallback.tripPolyline,
+    legPolyline: job.legPolyline ?? fallback.legPolyline,
   );
 }

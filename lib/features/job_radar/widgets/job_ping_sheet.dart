@@ -7,7 +7,6 @@ import '../../../core/theme/rider_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/haptics.dart';
 import '../../../models/delivery_job.dart';
-import '../../../widgets/rider_bottom_sheet.dart';
 
 class JobPingSheet extends StatefulWidget {
   const JobPingSheet({
@@ -71,8 +70,7 @@ class _JobPingSheetState extends State<JobPingSheet>
           child: child,
         );
       },
-      child: RiderBottomSheet(
-        child: Column(
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: staggerIn([
             Row(
@@ -169,7 +167,6 @@ class _JobPingSheetState extends State<JobPingSheet>
               ],
             ),
           ]),
-        ),
       ),
     );
   }

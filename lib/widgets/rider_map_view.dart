@@ -23,6 +23,8 @@ class RiderMapView extends StatefulWidget {
     this.pickup,
     this.dropoff,
     this.target,
+    this.legRoute,
+    this.tripRoute,
     this.bottomPadding = 0,
     this.statusChip,
   });
@@ -35,6 +37,8 @@ class RiderMapView extends StatefulWidget {
 
   /// Which stop the rider is currently driving to (drawn as the route end).
   final model.GeoPoint? target;
+  final List<LatLng>? legRoute;
+  final List<LatLng>? tripRoute;
 
   /// Height of the bottom panel so the camera frames content above it.
   final double bottomPadding;
@@ -192,32 +196,43 @@ class _RiderMapViewState extends State<RiderMapView> with SingleTickerProviderSt
     };
 
     final polylines = <Polyline>{
-      if (widget.target case final t?)
+      if (widget.tripRoute case final trip? when trip.length >= 2)
+        Polyline(
+          polylineId: const PolylineId('job'),
+          points: trip,
+          color: RiderColors.primaryBlack.withValues(alpha: 0.22),
+          width: 4,
+          startCap: Cap.roundCap,
+          endCap: Cap.roundCap,
+          jointType: JointType.round,
+        ),
+      if (widget.legRoute case final leg? when leg.length >= 2)
+        Polyline(
+          polylineId: const PolylineId('leg'),
+          points: leg,
+          color: RiderColors.routeLine,
+          width: 5,
+          startCap: Cap.roundCap,
+          endCap: Cap.roundCap,
+          jointType: JointType.round,
+        )
+      else if (widget.target case final t?)
         Polyline(
           polylineId: const PolylineId('leg'),
           points: [me, LatLng(t.lat, t.lng)],
           color: RiderColors.routeLine,
           width: 5,
           geodesic: true,
-          patterns: [PatternItem.dash(28), PatternItem.gap(14)],
           startCap: Cap.roundCap,
           endCap: Cap.roundCap,
         ),
-      if (widget.pickup case final p?)
-        if (widget.dropoff case final d?)
-          Polyline(
-            polylineId: const PolylineId('job'),
-            points: [LatLng(p.lat, p.lng), LatLng(d.lat, d.lng)],
-            color: RiderColors.primaryBlack.withValues(alpha: 0.25),
-            width: 3,
-            geodesic: true,
-          ),
     };
 
     return Stack(
       fit: StackFit.expand,
       children: [
-        GoogleMap(
+        RepaintBoundary(
+          child: GoogleMap(
             initialCameraPosition: CameraPosition(target: LatLng(widget.lat, widget.lng), zoom: 15.5),
             onMapCreated: (controller) {
               _controller = controller;
@@ -234,6 +249,7 @@ class _RiderMapViewState extends State<RiderMapView> with SingleTickerProviderSt
             buildingsEnabled: false,
             trafficEnabled: false,
           ),
+        ),
         if (widget.statusChip case final chip?)
           Positioned(
             top: MediaQuery.paddingOf(context).top + 72,
@@ -299,7 +315,6 @@ Future<BitmapDescriptor> _paint({
   final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
   return BitmapDescriptor.bytes(
     bytes!.buffer.asUint8List(),
-    imagePixelRatio: ratio,
     width: size,
     height: size,
   );

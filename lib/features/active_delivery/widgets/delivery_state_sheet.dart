@@ -6,7 +6,6 @@ import '../../../core/theme/rider_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/haptics.dart';
 import '../../../models/delivery_job.dart';
-import '../../../widgets/rider_bottom_sheet.dart';
 import '../../../widgets/swipe_to_confirm.dart';
 import 'delivery_stepper.dart';
 
@@ -36,10 +35,9 @@ class DeliveryStateSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return RiderBottomSheet(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
           DeliveryStepper(phase: phase),
           const SizedBox(height: 16),
           AnimatedSwitcher(
@@ -80,7 +78,6 @@ class DeliveryStateSheet extends StatelessWidget {
           const SizedBox(height: 18),
           _footer(context),
         ],
-      ),
     );
   }
 

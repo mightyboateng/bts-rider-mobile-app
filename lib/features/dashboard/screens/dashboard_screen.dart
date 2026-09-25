@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import '../../../core/map/polyline_codec.dart';
 import '../../../core/theme/rider_colors.dart';
 import '../../../data/providers/rider_work_provider.dart';
 import '../../../models/delivery_job.dart';
 import '../../../widgets/earnings_pill.dart';
-import '../../../widgets/rider_bottom_sheet.dart';
+import '../../../widgets/draggable_rider_sheet.dart';
 import '../../../widgets/rider_map_view.dart';
 import '../../active_delivery/widgets/delivery_state_sheet.dart';
 import '../../job_radar/widgets/job_ping_sheet.dart';
@@ -24,12 +24,29 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  double _sheetHeight = 0;
+  final _sheet = DraggableScrollableController();
+
+  static const _kSheetPad = 0.36;
+
+  @override
+  void dispose() {
+    _sheet.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(riderWorkProvider);
     final job = session.activeJob ?? session.incomingJob;
+
+    ref.listen<RiderWorkState>(riderWorkProvider, (prev, next) {
+      if (prev == null) return;
+      if (!prev.hasIncomingJob && next.hasIncomingJob) {
+        _snapTo(0.52);
+      } else if (!prev.hasActiveDelivery && next.hasActiveDelivery) {
+        _snapTo(0.4);
+      }
+    });
 
     return Stack(
       fit: StackFit.expand,
@@ -41,7 +58,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           pickup: job?.pickup,
           dropoff: job?.dropoff,
           target: _target(session),
-          bottomPadding: _sheetHeight,
+          legRoute: _decode(job?.legPolyline),
+          tripRoute: _decode(job?.tripPolyline),
+          bottomPadding: MediaQuery.sizeOf(context).height * _kSheetPad,
           statusChip: _statusChip(session),
         ),
         SafeArea(
@@ -84,38 +103,23 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
           ),
         ),
-        Align(
-          alignment: Alignment.bottomCenter,
-          child: _MeasureSize(
-            onChange: (size) {
-              if ((size.height - _sheetHeight).abs() > 2) {
-                setState(() => _sheetHeight = size.height);
-              }
-            },
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 380),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeIn,
-              transitionBuilder: (child, animation) => FadeTransition(
-                opacity: animation,
-                child: SlideTransition(
-                  position: Tween(begin: const Offset(0, 0.08), end: Offset.zero).animate(animation),
-                  child: child,
-                ),
-              ),
-              layoutBuilder: (current, previous) => Stack(
-                alignment: Alignment.bottomCenter,
-                children: [...previous, ?current],
-              ),
-              child: KeyedSubtree(
-                key: ValueKey(_panelKey(session)),
-                child: _bottomPanel(ref, session),
-              ),
-            ),
-          ),
+        DraggableRiderSheet(
+          controller: _sheet,
+          initialSize: 0.36,
+          minSize: 0.22,
+          maxSize: 0.92,
+          snapSizes: const [0.28, 0.4, 0.88],
+          builder: (context) => _bottomPanel(ref, session),
         ),
       ],
     );
+  }
+
+  void _snapTo(double size) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_sheet.isAttached) return;
+      _sheet.animateTo(size, duration: const Duration(milliseconds: 280), curve: Curves.easeOutCubic);
+    });
   }
 
   GeoPoint? _target(RiderWorkState session) {
@@ -139,13 +143,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     if (session.hasIncomingJob) return 'Incoming job';
     if (session.isOnline) return 'Online · Ghana';
     return null;
-  }
-
-  String _panelKey(RiderWorkState session) {
-    if (session.hasIncomingJob) return 'ping';
-    if (session.hasActiveDelivery) return 'delivery';
-    if (session.isOnline) return 'searching';
-    return 'offline';
   }
 
   Widget _bottomPanel(WidgetRef ref, RiderWorkState session) {
@@ -175,17 +172,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     }
 
     if (session.isOnline) {
-      return RiderBottomSheet(
-        child: SearchingRadar(onGoOffline: work.goOffline),
-      );
+      return SearchingRadar(onGoOffline: work.goOffline);
     }
 
-    return RiderBottomSheet(
-      child: GoOnlineSheet(
-        onGoOnline: work.goOnline,
-        blockedByCashCap: session.isOverCashCap || session.cashCapBlockingOrders,
-      ),
+    return GoOnlineSheet(
+      onGoOnline: work.goOnline,
+      blockedByCashCap: session.isOverCashCap || session.cashCapBlockingOrders,
     );
+  }
+
+  List<LatLng>? _decode(String? encoded) {
+    if (encoded == null || encoded.isEmpty) return null;
+    final points = decodePolyline(encoded);
+    return points.length >= 2 ? points : null;
   }
 }
 
@@ -243,36 +242,5 @@ class _StatusPill extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-/// Reports its child's laid-out size so the map can pad above the sheet.
-class _MeasureSize extends SingleChildRenderObjectWidget {
-  const _MeasureSize({required this.onChange, required super.child});
-
-  final ValueChanged<Size> onChange;
-
-  @override
-  RenderObject createRenderObject(BuildContext context) => _MeasureSizeRender(onChange);
-
-  @override
-  void updateRenderObject(BuildContext context, covariant _MeasureSizeRender renderObject) {
-    renderObject.onChange = onChange;
-  }
-}
-
-class _MeasureSizeRender extends RenderProxyBox {
-  _MeasureSizeRender(this.onChange);
-
-  ValueChanged<Size> onChange;
-  Size? _last;
-
-  @override
-  void performLayout() {
-    super.performLayout();
-    final current = size;
-    if (_last == current) return;
-    _last = current;
-    SchedulerBinding.instance.addPostFrameCallback((_) => onChange(current));
   }
 }
